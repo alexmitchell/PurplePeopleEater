@@ -7,9 +7,12 @@ class Move (object?):
 
 
 # Relays:
+class Setup (Task):
+    """ Used for setting up the game before it starts. Mainly for assigning
+    ID's. Not 100% sure this is necessary. """
 class Reflex (Task):
     """ The only relay that can change the world (data).
-    Listens (indirectly?) to the network """
+    Listens (indirectly?) to the network. """
     # Reflex {{{1
     def setup (self):
         world = self.world = self.engine.get_world()

@@ -4,7 +4,7 @@ import sys
 
 import network_settings
 import relays
-#from world import World
+from world import World
 #from game import Game
 
 from utilities.core import Engine
@@ -76,13 +76,22 @@ class ServerGame (Engine):
 
     def setup (self):
         print 'Server game setting up'
+        self.world.setup(player_count)
         # Set up services and relays
         for task in self.tasks:
             task.setup()
 
-        self.forum.lock()
+        # Give the players unique id's and names.
+        self.world.set_player_ids (make_player_id_dictionary())
 
-        #Send world data to clients
+        #self.game.setup()
+        self.forum.lock()
+        
+        # Get names from clients? Send them to everyone?
+
+        #Can I send entire widget as a message?
+        #Send player ids
+        #Send other world data through normal means.
         #self.forum.publish (Ping('hello!'))
 
         #Somehow send start message!
@@ -103,6 +112,9 @@ class ServerGame (Engine):
         self.server.update()
 
     # Methods {{{1
+    def make_player_id_dictionary ():
+        raise NotImplementedError
+
     def successor (self):
         #return ServerPostgame(self.loop)
         return None
