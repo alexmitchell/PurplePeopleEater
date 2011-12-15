@@ -1,24 +1,42 @@
+from utilities.messaging import Forum
 from utilities.core import Task
 
+
+# All classes in here interface with the forum in some way.
+
+
 # Command messages. These are the only things that can be sent.
-class Move (object?):
-    def __init__ (self, vector):
-        self.vector = vector
+# Inheriting object is to make the class a new style class. Just do it.
+class InitialWorld (object):
+    def __init__(self, world):
+        self.world = world
+
+class FinishPregame (object):
+    pass
+
+class Eater (object):
+    def __init__(self, new_eater, old_eater):
+        self.new = new_eater
+        self.old = old_eater
+
 
 
 # Relays:
-class Setup (Task):
-    """ Used for setting up the game before it starts. Mainly for assigning
-    ID's. Not 100% sure this is necessary. """
 class Reflex (Task):
-    """ The only relay that can change the world (data).
-    Listens (indirectly?) to the network. """
+    """ The only relay that can change the world (data)."""
     # Reflex {{{1
-    def setup (self):
-        world = self.world = self.engine.get_world()
-        forum = self.forum = self.engine.get_forum()
+    def __init__ (self, engine):
+        Task.__init__ (engine)
+
+    def setup (self, forum, world):
+        self.world = world
+        self.forum = forum 
 
         # set up subscriptions
+        forum.subscribe(Eater, self.change_eater)
+
+    def change_eater(self, message):
+        self.world.change_eater(message.new, message.old)
 
     def update (self, time):
         pass

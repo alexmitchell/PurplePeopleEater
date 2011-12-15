@@ -4,8 +4,8 @@ import engines
 
 class ServerLoop (Loop):
     def __init__ (self):
-        self.engine = engines.ServerPregame(self)
+        self.engine = engines.ServerNetworkSetup(self)
 
 class UserLoop (Loop):
     def __init__ (self):
-        self.engine = engines.ClientPregame(self)
+        self.engine = engines.ClientNetworkSetup(self)
