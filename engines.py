@@ -1,22 +1,22 @@
 #used for debugging
 import time
 import sys
-import random
 
 import network_settings
 import game_settings
-from relays import *
+import gui
+from messaging import *
 from world import World
+from relays import *
 
 from utilities.core import Engine
-from utilities.network import Server
-from utilities.network import Client
-from utilities.messaging import Forum
+from utilities.network import Server, Client
+from utilities.messaging import Forum, SimpleSend, SimpleReceive
 
 
 class ServerNetworkSetup (Engine):
     """ Gets the server ready to run the game: Sets up the network, connect to
-    clients, set up the forum. """
+    clients. """
     
     # Consructor {{{1
     def __init__ (self, loop):
@@ -47,67 +47,57 @@ class ServerNetworkSetup (Engine):
     # }}}1
 
 class ServerPregame (Engine):
-    """ Sets up the world and makes sure the clients receive it. Eventually 
-    allow for users to modify the initial world settings plus personalizations
-    like name or color. """
+    """ Sets up the world and creates client identities then sends both to each
+    client. Eventually allow for users to modify the initial world settings
+    plus personalizations like name or color. """
     # Constructor {{{1
     def __init__ (self, loop, server):
         Engine.__init__(self,loop)
         self.server = server
 
-        pipes = server.get_pipes()
-        self.forum = Forum(pipes)
-
         self.world = World()
+
+        self.conversations = []
 
     # Setup {{{1
     def setup (self):
-        # Gather identities for the World.
-        human_identities = self.get_player_identities()
-        #ai_identities = self.get_ai_identities()
-        #player_identities = human_identities + ai_identities
-        target_identities = self.get_target_identities()
+        pipes = server.get_pipes()
 
+        # Create identities for the World.
+        human_identities = range(len(pipes))
+        #ai_identities = self.create_ai_identities()
+        #player_identities = human_identities + ai_identities
+        target_identities = range(game_settings.target_count)
+
+        # Create the world.
         self.world.setup(human_identities, target_identities)
         #self.world.setup(player_identities, target_identities)
 
-        for eater_id in self.get_eaters(player_identities):
-            self.world.change_eater(eater_id, infinity)
+        # Prepare to send info to the clients.
+        for identity in human_identities:
+            pipe = pipes[identity]
+            setup_world = SetupWorld(self.world, identity)
+            self.conversations.append(SimpleSend(pipe, setup_world))
 
-        # Set up any subscriptions for receiving info from the client. Lock 
-        # when finished.
-        self.forum.lock()
-
-        # Send the world to everyone:
-        world_message = WorldMessage(self.world)
-        self.forum.publish(world_message, self.finish_pregame)
-
-    def get_player_identities(self):
-        pipes = self.server.get_pipes()
-        identities = []
-        for pipe in pipes:
-            identities.append(pipe.get_remote_id())
-        return identities
-    
-    def get_target_identities(self):
-        identities = range(game_settings.target_count)
-        return identities
-
-    def get_eaters (self, players):
-        count = game_settings.eater_count
-        eaters = random.sample(players, count)
-        return eaters
+        # Start the conversations.
+        for conversation in self.conversations:
+            conversation.start()
 
     # Update, Callbacks, and Methods {{{1
     def update(self, time):
-        self.forum.update()
-
-    def all_done (self, message):
-        self.forum.publish(FinishPregame(), self.finish)
+        active_conversations = []
+        for conversation in self.conversations:
+            if not conversation.finished():
+                active_conversations.append(conversation)
+                conversation.update()
+        if active_conversations: self.conversations = active_conversations
+        else: self.finish()
 
     def successor (self):
-        self.forum.unlock()
-        return ServerGame(self.loop, self.forum, self.world)
+        pipes = server.get_pipes()
+        forum = Forum(pipes)
+
+        return ServerGame(self.loop, forum, self.world)
 
     def teardown(self):
         pass
@@ -126,13 +116,16 @@ class ServerGame (Engine):
         self.world = world
 
         # Create the relays.
-        self.referee = relays.Referee(self)
-        self.reflex = relays.Reflex(self)
+        publisher = self.forum.get_publisher()
+        subscriber = self.forum.get_subscriber()
+
+        self.referee = relays.Referee(self, publisher, self.world)
+        self.reflex = relays.Reflex(self, subscriber, self.world)
         #ai_relay = relays.AIRelay(self)
 
     def setup (self):
-        self.referee.setup(self.forum, self.world)
-        self.reflex.setup(self.forum, self.world)
+        self.referee.setup()
+        self.reflex.setup()
 
         self.forum.lock()
 
@@ -175,7 +168,7 @@ class ServerPostgame (Engine):
 
 
 class ClientNetworkSetup (Engine):
-    # Sets up the network and forum for the client.
+    # Sets up the network for the client.
     # Constructor {{{1
     def __init__ (self, loop):
         Engine.__init__ (self, loop)
@@ -193,7 +186,6 @@ class ClientNetworkSetup (Engine):
         self.client.connect()
 
     def connected(self, pipe):
-        self.forum.setup (pipe)
         self.finish()
 
     def successor (self):
@@ -209,30 +201,29 @@ class ClientPregame (Engine):
         Engine.__init__(self, loop)
         self.client = client
 
-        self.forum = Forum(client.get_pipe())
         self.world = None
+        self.conversation = None
 
     def setup(self):
-        self.forum.subscribe(InitialWorld, self.initial_world)
-        self.forum.subscribe(FinishPregame, self.finish_callback)
-        
-        self.forum.lock()
+        pipe = self.client.get_pipe()
+        flavor = SetupWorld
+        callback = self.setup_world
+        self.conversation = SimpleReceive(pipe, flavor, callback)
 
     # Update, Callbacks, and Methods {{{1
     def update(self):
-        self.forum.update()
+        if not self.conversation.finished(): self.conversation.update()
+        else: self.finish()
 
-    def initial_world(self, message):
+    def setup_world(self, message):
         self.world = message.world
-        owner = self.client.get_pipe().get_local_id()
-        self.world.set_owner(owner)
-
-    def finish_callback(self, message):
-        self.finish()
+        self.world.set_owner(message.identity)
 
     def successor (self):
-        self.forum.unlock()
-        return ClientGame(self.loop, self.forum, self.world)
+        pipe = self.client.get_pipe()
+        forum = Forum(pipe)
+
+        return ClientGame(self.loop, forum, self.world)
     
     def teardown (self):
         pass
@@ -248,17 +239,20 @@ class ClientGame (Engine):
         self.forum = forum
         self.world = world
         
-        #self.gui = Gui(self)
+        # Set up the relays.
+        publisher = self.forum.get_publisher()
+        subscriber = self.forum.get_subscriber()
 
-        self.reflex = relays.Reflex(self)
-        self.player_relay = relays.PlayerRelay(self)
+        self.reflex = relays.Reflex(self, subscriber, self.world)
+        self.player_relay = relays.PlayerRelay(self, publisher, self.world)
 
-        self.tasks = self.reflex, self.player_relay
-        #self.tasks = self.reflex, self.gui, self.player_relay
+        self.gui = Gui(self, self.world, self.player_relay)
+
+        self.tasks = self.reflex, self.player_relay, self.gui
 
     def setup (self):
         for task in self.tasks:
-            task.setup(self.forum, self.world)
+            task.setup()
         self.forum.lock()
     
     # Update {{{1
