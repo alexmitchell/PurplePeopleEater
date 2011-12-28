@@ -52,77 +52,73 @@ class Gui:
     def draw(self):
         world = self.world
         screen = self.screen
+        owner = world.get_owner_identity()
 
-        # Draw the background.
+        # Draw the background. {{{2
         screen.fill(player_settings.background_color)
 
-        # Draw the players.
-        players = self.world.get_players()
+        # Draw the players. {{{2
+        players = world.get_players()
         player_colors = player_settings.player_colors
         for identity, player in players:
             color = player_colors[identity]
             if identity in world.get_eater_identities():
                 color = player_settings.eater_color
 
-            position = player.get_position()
+            position = player.get_position().pygame
             radius = player.get_radius()
 
             pygame.draw.circle(screen, color, position, radius)
-###############################################################################
-##                      New code above. Old code below.                      ##
-###############################################################################
-raise NotImplementedError
 
-        # Draw the button.
-        button = world.get_button()
+        # Draw the targets. {{{2
+        targets = world.get_targets()
+        target_color = player_settings.target_color
+        is_eater = owner in world.get_eater_identities()
+        for target in targets:
+            position = target.get_position().get_pygame()
+            radius = target.get_radius()
 
-        color = settings.button_color
-        position = button.get_position().get_pygame()
-        radius = button.get_radius()
+            if is_eater:
+                pygame.draw.circle(screen, target_color, position, radius)
+            else:
+                progress = 1 - button.get_timer() / button.get_timeout()
+                points = [position]
 
-        if world.is_eater(): progress = 1
-        else: progress = 1 - button.get_elapsed() / button.get_timeout()
-        
-        points = [position]
+                for index in range(50):
+                    fraction = index / 50
+                    angle = 2 * math.pi * fraction
 
-        for index in range(50):
-            fraction = index / 50
-            angle = 2 * math.pi * fraction
+                    if fraction > progress:
+                        break
 
-            if fraction > progress:
-                break
+                    x = position[0] + radius * math.cos(angle)
+                    y = position[1] + radius * math.sin(angle)
 
-            x = position[0] + radius * math.cos(angle)
-            y = position[1] + radius * math.sin(angle)
+                    point = x, y
+                    points.append(point)
 
-            point = x, y
-            points.append(point)
+                if len(points) > 2:
+                    pygame.draw.polygon(screen, color, points)
 
-        if len(points) > 2:
-            pygame.draw.polygon(screen, color, points)
-
-        # Draw a status message.
+        # Draw a status message. {{{2
         template = "%s: %d HP"
+        status = template % (player_settings.owner_name, owner.get_life())
 
-        me = world.get_me()
-        you = world.get_you()
-
-        my_status = template % (settings.my_name, me.get_health())
-        your_status = template % (settings.your_name, you.get_health())
-
-        map = world.get_map().get_size()
-        width, height = self.status_font.size(your_status)
+        #map_size = self.size
+        #width, height = self.status_font.size(your_status)
 
         my_position = 5, 5
-        your_position = map.width - width - 5, 5
+        #your_position = map_size.x - width - 5, 5
 
-        my_message = self.status_font.render(my_status, True, settings.text_color)
-        your_message = self.status_font.render(your_status, True, settings.text_color)
+        text color = player_settings.text_color
+        my_message = self.status_font.render(my_status, True, text_color)
+        #your_message = self.status_font.render(your_status, True, settings.text_color)
 
         screen.blit(my_message, my_position)
-        screen.blit(your_message, your_position)
+        #screen.blit(your_message, your_position)
+        # }}}2
 
-        # Finish the update.
+        # Finish the update. 
         pygame.display.flip()
 
     # }}}1

@@ -14,7 +14,7 @@ class World:
         self.time_elapsed = 0
         self.map_size = game_settings.map_size
 
-        self.owner = None
+        self.owner_identity = None
         self.winner = None
 
         self.players = {}
@@ -65,6 +65,7 @@ class World:
     def get_players(self): return self.players
     def get_targets(self): return self.targets
     def get_eater_identities(self): return self.eater_identities
+    def get_owner_identity(self): return self.owner_identity()
     # }}}1
 
 class Token (Vehicle):
