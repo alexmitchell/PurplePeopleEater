@@ -201,7 +201,7 @@ class PlayerAcceleration(BaseBehavior):
         BaseBehavior.__init__(self, sprite, weight)
     
     def update(self):
-        return self.acceleration, self.weight
+        return self.acceleration, self.power
 
     def set_acceleration(self, new):
         self.last_delta_velocity = self.acceleration
