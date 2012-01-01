@@ -4,13 +4,13 @@ import sys
 
 import network_settings
 import game_settings
-import gui
-from messaging import *
+from gui import Gui
+from messages import *
 from world import World
 from relays import *
 
 from utilities.core import Engine
-from utilities.network import Server, Client
+from utilities.network import PickleServer, PickleClient
 from utilities.messaging import Forum, SimpleSend, SimpleReceive
 
 
@@ -20,16 +20,16 @@ class ServerNetworkSetup (Engine):
     
     # Consructor {{{1
     def __init__ (self, loop):
+        print 'S: Setting up server.'
         Engine.__init__ (self, loop)
 
-        host = network_settings.host
         port = network_settings.port
         seats = network_settings.seats
         callback = self.server_full_callback
-        self.server = Server (host, port, seats, callback)
+        self.server = PickleServer (port, seats, callback)
 
     def setup (self):
-        pass
+        self.server.open()
 
     # Update {{{1
     def update (self, time):
@@ -37,9 +37,10 @@ class ServerNetworkSetup (Engine):
 
     # Methods {{{1
     def server_full_callback(self, *pipes):
-        self.finish()
+        self.exit_engine()
 
     def successor (self):
+        print 'S: Server set up. All clients connected.'
         return ServerPregame(self.loop, self.server)
     
     def teardown (self):
@@ -52,6 +53,7 @@ class ServerPregame (Engine):
     plus personalizations like name or color. """
     # Constructor {{{1
     def __init__ (self, loop, server):
+        print 'S: Begin pregame.'
         Engine.__init__(self,loop)
         self.server = server
 
@@ -61,13 +63,15 @@ class ServerPregame (Engine):
 
     # Setup {{{1
     def setup (self):
-        pipes = server.get_pipes()
+        pipes = self.server.get_pipes()
 
         # Create identities for the World.
         human_identities = range(len(pipes))
         #ai_identities = self.create_ai_identities()
         #player_identities = human_identities + ai_identities
         target_identities = range(game_settings.target_count)
+
+        print 'Human identites: ', human_identities
 
         # Create the world.
         self.world.setup(human_identities, target_identities)
@@ -91,11 +95,11 @@ class ServerPregame (Engine):
                 active_conversations.append(conversation)
                 conversation.update()
         if active_conversations: self.conversations = active_conversations
-        else: self.finish()
+        else: self.exit_engine()
 
     def successor (self):
-        pipes = server.get_pipes()
-        forum = Forum(pipes)
+        pipes = self.server.get_pipes()
+        forum = Forum(*pipes)
 
         return ServerGame(self.loop, forum, self.world)
 
@@ -109,6 +113,7 @@ class ServerGame (Engine):
     will run the AI too. """
     # Constructor {{{1
     def __init__ (self, loop, forum, world):
+        print 'S: Begin game engine.'
         Engine.__init__ (self, loop)
 
         # Store the basic services.
@@ -119,9 +124,9 @@ class ServerGame (Engine):
         publisher = self.forum.get_publisher()
         subscriber = self.forum.get_subscriber()
 
-        self.referee = relays.Referee(self, publisher, self.world)
-        self.reflex = relays.Reflex(self, subscriber, self.world)
-        #ai_relay = relays.AIRelay(self)
+        self.referee = Referee(self, publisher, self.world)
+        self.reflex = Reflex(self, subscriber, self.world)
+        #ai_relay = AIRelay(self)
 
     def setup (self):
         self.referee.setup()
@@ -133,17 +138,21 @@ class ServerGame (Engine):
     def update (self, time):
         self.forum.update()
         self.reflex.update(time)
-        self.world.update()
+        self.world.update(time)
         self.referee.update(time)
 
     # Methods {{{1
-    def successor (self):
+    def game_over(self):
+        # Called by the Referee. 
+        self.exit_loop()
+        print 'S: Ending loop.'
+
+    def successor(self):
         #return ServerPostgame(self.loop)
         return None
     
-    def teardown (self):
-        print 'Server game tearing down'
-        self.relay.teardown()
+    def teardown(self):
+        self.reflex.teardown()
         self.referee.teardown()
         self.forum.teardown()
         self.world.teardown()
@@ -160,7 +169,7 @@ class ServerPostgame (Engine):
         pass
 
     def update (self, time):
-        self.finish()
+        self.exit_loop()
 
     def teardown (self):
         pass
@@ -171,12 +180,13 @@ class ClientNetworkSetup (Engine):
     # Sets up the network for the client.
     # Constructor {{{1
     def __init__ (self, loop):
+        print 'C: Network setting up.'
         Engine.__init__ (self, loop)
 
         host = network_settings.host
         port = network_settings.port
         callback = self.connected
-        self.client = Client (host, port, callback)
+        self.client = PickleClient (host, port, callback)
 
     def setup (self):
         pass
@@ -186,7 +196,8 @@ class ClientNetworkSetup (Engine):
         self.client.connect()
 
     def connected(self, pipe):
-        self.finish()
+        print 'C: Client connected.'
+        self.exit_engine()
 
     def successor (self):
         return ClientPregame(self.loop, self.client)
@@ -198,6 +209,7 @@ class ClientNetworkSetup (Engine):
 class ClientPregame (Engine):
     # Constructor {{{1
     def __init__ (self, loop, client):
+        print 'C: Begin pregame.'
         Engine.__init__(self, loop)
         self.client = client
 
@@ -209,15 +221,16 @@ class ClientPregame (Engine):
         flavor = SetupWorld
         callback = self.setup_world
         self.conversation = SimpleReceive(pipe, flavor, callback)
+        self.conversation.start()
 
     # Update, Callbacks, and Methods {{{1
-    def update(self):
+    def update(self, time):
         if not self.conversation.finished(): self.conversation.update()
-        else: self.finish()
+        else: self.exit_engine()
 
     def setup_world(self, message):
         self.world = message.world
-        self.world.set_owner(message.identity)
+        self.world.set_owner_identity(message.identity)
 
     def successor (self):
         pipe = self.client.get_pipe()
@@ -234,6 +247,7 @@ class ClientGame (Engine):
     the server which will eventually tell the client's game what to do. """
     # Constructor {{{1
     def __init__ (self, loop, forum, world):
+        print 'C: Begin game engine.'
         Engine.__init__ (self, loop)
 
         self.forum = forum
@@ -243,31 +257,37 @@ class ClientGame (Engine):
         publisher = self.forum.get_publisher()
         subscriber = self.forum.get_subscriber()
 
-        self.reflex = relays.Reflex(self, subscriber, self.world)
-        self.player_relay = relays.PlayerRelay(self, publisher, self.world)
+        self.reflex = Reflex(self, subscriber, self.world)
+        self.player_relay = PlayerRelay(self, publisher, self.world)
 
-        self.gui = Gui(self, self.world, self.player_relay)
-
-        self.tasks = self.reflex, self.player_relay, self.gui
+        self.gui = Gui(self.world, self.player_relay)
 
     def setup (self):
-        for task in self.tasks:
-            task.setup()
+        self.reflex.setup()
+        self.player_relay.setup()
+        self.gui.setup()
+
         self.forum.lock()
     
     # Update {{{1
     def update (self, time):
         self.forum.update()
-        for task in self.tasks:
-            task.update(time)
+        self.reflex.update(time)
+        self.player_relay.update(time)
+        self.world.update(time)
+        self.gui.update(time)
 
     # Methods {{{1
+    def game_over(self):
+        # Called by the Reflex?
+        print 'Game over.'
+        self.exit_engine()
+
     def successor (self):
         self.forum.unlock()
-        return ClientPostgame(self.loop, self.forum, self.world, self.gui):
+        return ClientPostgame(self.loop, self.forum, self.world, self.gui)
     
     def teardown (self):
-        print 'Client game tearing down'
         time.sleep(1)
     # }}}1
 
@@ -283,7 +303,7 @@ class ClientPostgame (Engine):
         self.gui = gui
 
     def setup (self):
-        self.forum.subscribe(Quit(), self.quit)
+        #self.forum.subscribe(Quit, self.quit)
         self.forum.lock()
 
     def update (self, time):
@@ -291,7 +311,7 @@ class ClientPostgame (Engine):
         # self.gui.update (time)
         
     def quit (self, message):
-        self.finish()
+        self.exit_loop()
 
     def teardown (self):
         self.gui.teardown()

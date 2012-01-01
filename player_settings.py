@@ -3,6 +3,8 @@ from pygame.locals import *
 controller_type = "joystick"
 #controller_type = "keyboard"
 
+owner_name = 'Alex'
+
 background_color = Color("Black")
 text_color = Color("White")
 

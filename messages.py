@@ -7,6 +7,11 @@ class SetupWorld (object):
         self.identity = player_identity
 
 # In game messages:
+class Accelerate (object):
+    def __init__ (self, identity, acceleration_ratio):
+        self.identity = identity
+        self.acceleration_ratio = acceleration_ratio
+
 class Bite (object):
     def __init__ (self, biter_identity):
         self.biter = biter_identity
@@ -26,7 +31,11 @@ class MoveTarget (object):
         self.position = position
         self.reset_life = reset
 
+class Bounce (object):
+    def __init__(self, identity, orientations):
+        self.identity = identity
+        self.orientations = orientations
+
 class GameOver (object):
     def __init__(self, winner):
         self.winner = winner
-

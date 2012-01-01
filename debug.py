@@ -24,8 +24,8 @@ if __name__ == "__main__":
 
     threads = [
             DebuggingProcess("Server", main.ServerLoop()),
+            DebuggingProcess("Client", main.UserLoop()),
             DebuggingProcess("Client", main.UserLoop()) ]
-            #DebuggingProcess("Client", main.UserLoop()) ]
 
     try:
         for thread in threads:

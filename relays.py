@@ -1,5 +1,7 @@
 import random
 
+from messages import *
+from utilities.vector import Vector
 from utilities.messaging import Forum
 from utilities.core import Task
 
@@ -13,13 +15,31 @@ class Reflex (Task):
         self.world = world
 
     def setup (self):
+        forum = self.forum
         # set up subscriptions
+        forum.subscribe(Accelerate, self.accelerate)
         forum.subscribe(Bite, self.bite)
         forum.subscribe(ChangeEater, self.change_eater)
         forum.subscribe(DestroyPlayer, self.destroy_player)
         forum.subscribe(MoveTarget, self.move_target)
+        forum.subscribe(Bounce, self.bounce)
         forum.subscribe(GameOver, self.game_over)
     # }}}1
+
+    # Accelerate {{{1
+    def accelerate (self, message):
+        try:
+            identity = message.identity
+            ratio = message.acceleration_ratio
+
+            player = self.world.players[identity]
+            max_a = player.get_max_acceleration()
+            behavior = player.get_player_behavior()
+
+            acceleration = ratio * max_a
+            behavior.set_acceleration(acceleration)
+        except KeyError:
+            pass
 
     # Bite {{{1
     def bite (self, message):
@@ -28,7 +48,7 @@ class Reflex (Task):
         if biter_identity in eaters:
             players = self.world.players
             for player in players.keys():
-                if not player == biter_identity and player not in eater:
+                if not player == biter_identity and player not in eaters:
                     attacker = players[biter_identity]
                     victim = players[player]
                     if self.token_collision(attacker, victim):
@@ -36,11 +56,14 @@ class Reflex (Task):
                         victim.damage(damage, biter_identity)
         else:
             targets = self.world.targets
-            for target in target.value():
-                human = self.world.players[biter_identity]
-                if self.token_collision(human, target):
-                    damage = human.get_bite_damage()
-                    target.damage(damage, biter_identity)
+            for target in targets.values():
+                try:
+                    human = self.world.players[biter_identity]
+                    if self.token_collision(human, target):
+                        damage = human.get_bite_damage()
+                        target.damage(damage, biter_identity)
+                except KeyError:
+                    pass
 
     # DestroyPlayer {{{1
     def destroy_player (self, message):
@@ -58,17 +81,46 @@ class Reflex (Task):
         if message.reset_life:
             target.reset_life()
 
+
+    # Bounce {{{1
+    def bounce(self, message):
+        identity = message.identity
+        orientations = message.orientations
+        player = self.world.players[identity]
+        x, y = player.get_position().get_pygame()
+        vx, vy = player.get_velocity().get_pygame()
+        map_x, map_y = self.world.get_map_size().get_pygame()
+
+        for orientation in orientations:
+            if 'Left' == orientation:
+                x = 0
+                vx = -vx
+            elif 'Right' == orientation:
+                x = map_x
+                vx = -vx
+            if 'Top' == orientation:
+                y = map_y
+                vy = -vy
+            elif 'Bottom' == orientation:
+                y = 0
+                vy = -vy
+        player.set_position(Vector(x,y))
+        player.set_velocity(Vector(vx,vy))
+
     # GameOver {{{1
     def game_over(self, message):
-        self.world.winner = message.winner
-        self.engine.finish()
+        winner = message.winner
+        self.world.winner = winner
+        self.engine.game_over()
+        if winner == self.world.owner_identity: print 'You won!'
+        else: print 'You lost.'
     # }}}1
 
     # Update and methods {{{1
     def update (self, time):
         pass
 
-    def token_collision(self, token_1, token_2)
+    def token_collision(self, token_1, token_2):
         position_1 = token_1.get_position()
         position_2 = token_2.get_position()
         difference = position_2 - position_1
@@ -78,7 +130,7 @@ class Reflex (Task):
         r2 = token_2.get_radius()
         critical = (r1 + r2)**2
 
-        return distance <= critical:
+        return distance <= critical
 
     def teardown (self):
         pass
@@ -105,16 +157,22 @@ class Referee (Task):
 
         # Check for number of players. If only one, announce winner. {{{2
         if 1 == len(players):
-            winner = players[0].get_identity())
+            winner_list = players.values()
+            winner = winner_list[0].get_identity()
             game_over = GameOver(winner)
             forum.publish(game_over)
         # }}}2
 
         for identity, player in players.items():
-            # Check player life. Destroy player if life below 0. {{{2
+            # Check player life. Destroy player if life 0. {{{2
             if player.get_life() <= 0:
                 destroy_player = DestroyPlayer(identity)
                 forum.publish(destroy_player)
+            # Check for a bounce {{{2
+            orientations = self.check_bounce(player)
+            if len(orientations) > 0:
+                bounce = Bounce(identity, orientations)
+                forum.publish(bounce)
             # }}}2
         
         for identity, target in targets.items():
@@ -139,7 +197,20 @@ class Referee (Task):
             # }}}2
 
     # Methods {{{1
-    def random_position(self)
+    def check_bounce(self, player):
+        map_x, map_y = self.world.get_map_size().get_pygame()
+        x,y = player.get_position().get_pygame()
+        orientations = []
+
+        if x < 0: orientations.append('Left')
+        elif x > map_x: orientations.append('Right')
+
+        if y < 0: orientations.append('Bottom')
+        elif y > map_y: orientations.append('Top')
+
+        return orientations
+        
+    def random_position(self):
         size = self.world.get_map_size()
         x = size.x * random.random()
         y = size.y * random.random()
@@ -161,8 +232,21 @@ class PlayerRelay (Task):
     def setup (self):
         pass
 
-    def accelerate(self, 
-    def bite(self,
+    # Accelerate {{{1
+    def accelerate(self, acceleration_ratio):
+        ratio = Accelerate(self.world.get_owner_identity(), acceleration_ratio)
+        self.forum.publish(ratio)
+
+    # Bite {{{1
+    def bite(self):
+        bite = Bite(self.world.get_owner_identity())
+        self.forum.publish(bite)
+
+    # Quit {{{1
+    def quit(self):
+        destroy = DestroyPlayer(self.world.get_owner_identity())
+        self.forum.publish(destroy)
+
     # Update and methods {{{1
     def update (self, time):
         pass

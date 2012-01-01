@@ -7,8 +7,7 @@ import controls
 import pygame
 from pygame.locals import *
 
-from shapes import *
-from vector import *
+from utilities.vector import Vector
 
 class Gui:
     # Constructor {{{1
@@ -50,17 +49,18 @@ class Gui:
 
     # Draw {{{1
     def draw(self):
-        world = self.world
         screen = self.screen
-        owner = world.get_owner_identity()
+        world = self.world
+        players = world.get_players()
+        targets = world.get_targets()
+        owner_identity = world.get_owner_identity()
 
         # Draw the background. {{{2
         screen.fill(player_settings.background_color)
 
         # Draw the players. {{{2
-        players = world.get_players()
         player_colors = player_settings.player_colors
-        for identity, player in players:
+        for identity, player in players.items():
             color = player_colors[identity]
             if identity in world.get_eater_identities():
                 color = player_settings.eater_color
@@ -71,17 +71,16 @@ class Gui:
             pygame.draw.circle(screen, color, position, radius)
 
         # Draw the targets. {{{2
-        targets = world.get_targets()
         target_color = player_settings.target_color
-        is_eater = owner in world.get_eater_identities()
-        for target in targets:
+        is_eater = owner_identity in world.get_eater_identities()
+        for target in targets.values():
             position = target.get_position().get_pygame()
             radius = target.get_radius()
 
             if is_eater:
                 pygame.draw.circle(screen, target_color, position, radius)
             else:
-                progress = 1 - button.get_timer() / button.get_timeout()
+                progress = 1 - target.get_timer() / target.get_timeout()
                 points = [position]
 
                 for index in range(50):
@@ -101,21 +100,19 @@ class Gui:
                     pygame.draw.polygon(screen, color, points)
 
         # Draw a status message. {{{2
-        template = "%s: %d HP"
-        status = template % (player_settings.owner_name, owner.get_life())
+        try:
+            template = "%s: %d HP"
+            owner = players[owner_identity]
+            status = template % (player_settings.owner_name, owner.get_life())
 
-        #map_size = self.size
-        #width, height = self.status_font.size(your_status)
+            text_position = 5, 5
 
-        my_position = 5, 5
-        #your_position = map_size.x - width - 5, 5
+            text_color = player_settings.text_color
+            text = self.status_font.render(status, True, text_color)
 
-        text color = player_settings.text_color
-        my_message = self.status_font.render(my_status, True, text_color)
-        #your_message = self.status_font.render(your_status, True, settings.text_color)
-
-        screen.blit(my_message, my_position)
-        #screen.blit(your_message, your_position)
+            screen.blit(text, text_position)
+        except KeyError:
+            pass
         # }}}2
 
         # Finish the update. 

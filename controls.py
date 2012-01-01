@@ -3,7 +3,7 @@ import sys
 import pygame
 from pygame.locals import *
 
-from vector import *
+from utilities.vector import Vector
 
 class Controller:
     """ Base class for the two control methods.  Mostly responsible for
@@ -17,7 +17,8 @@ class Controller:
         self.gui = gui
         self.callbacks = {
                 "motion" : lambda direction: None,
-                "button" : lambda: None }
+                "button" : lambda: None,
+                "quit" : lambda: None}
 
     def setup(self):
         """ Perform any additional setup that needs to be done.  This method is
@@ -36,6 +37,15 @@ class Controller:
     def on_motion(self, callback):
         """ Register a callback for a motion event. """
         self.callbacks["motion"] = callback
+
+    def on_quit(self, callback):
+        """ Register a callback for a quit event. """
+        self.callbacks["quit"] = callback
+    # Handlers {{{1
+    def quit_event(self, event):
+        """ This is an internal handler for any quit events.  This works by
+        simply instructing the world to send a game over message. """
+        self.callbacks["quit"]()
     # }}}1
 
 class Joystick(Controller):
@@ -54,21 +64,21 @@ class Joystick(Controller):
                 JOYAXISMOTION : self.motion_event,
                 JOYBUTTONDOWN : self.button_event }
 
-    # Update {{{1
     def setup(self):
         """ Connect to the joystick and prepare to begin accepting input.  If
         no joystick is found, the game will exit with an error message. """
 
         pygame.joystick.init()
 
-        if not pygame.joystick.get_count():
+        if 0 == pygame.joystick.get_count():
             print "No joystick found."
             print "Consider using the keyboard controller."
             sys.exit()
+        else:
+            self.joystick = pygame.joystick.Joystick(0)
+            self.joystick.init()
 
-        self.joystick = pygame.joystick.Joystick(0)
-        self.joystick.init()
-
+    # Update {{{1
     def update(self):
         """ Check to see if any joystick events have occurred since the last
         update cycle.  If so, perform any necessary processing and execute the
@@ -84,7 +94,6 @@ class Joystick(Controller):
     def motion_event(self, event):
         """ This is an internal handler to joystick motion events.  Only motion
         along the x and y coordinates is acted upon. """
-
         X, Y, Z = 0, 1, 2
 
         if event.axis in (X, Y):
@@ -104,12 +113,6 @@ class Joystick(Controller):
         """ This is an internal handler for joystick button events.  No
         processing is done; the callback is just executed immediately. """
         self.callbacks["button"]()
-
-    def quit_event(self, event):
-        """ This is an internal handler for any quit events.  This works by
-        simply instructing the world to send a game over message. """
-        world = self.gui.get_world()
-        world.game_over()
     # }}}1
 
 class Keyboard(Controller):
