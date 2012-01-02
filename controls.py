@@ -3,7 +3,7 @@ import sys
 import pygame
 from pygame.locals import *
 
-from utilities.vector import Vector
+from kxgames.vector import Vector
 
 class Controller:
     """ Base class for the two control methods.  Mostly responsible for

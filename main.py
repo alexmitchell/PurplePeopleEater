@@ -1,4 +1,4 @@
-from utilities.core import Loop
+from kxgames.core import Loop
 
 import engines
 

@@ -7,6 +7,12 @@ class SetupWorld (object):
         self.identity = player_identity
 
 # In game messages:
+class Sync (object):
+    def __init__ (self, positions, velocities, accelerations):
+        self.positions_dict = positions
+        self.velocities_dict = velocities
+        self.accelerations_dict = accelerations
+
 class Accelerate (object):
     def __init__ (self, identity, acceleration_ratio):
         self.identity = identity

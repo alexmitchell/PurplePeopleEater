@@ -7,7 +7,7 @@ import controls
 import pygame
 from pygame.locals import *
 
-from utilities.vector import Vector
+from kxgames.vector import Vector
 
 class Gui:
     # Constructor {{{1

@@ -8,10 +8,11 @@ from gui import Gui
 from messages import *
 from world import World
 from relays import *
+import server_gui
 
-from utilities.core import Engine
-from utilities.network import PickleServer, PickleClient
-from utilities.messaging import Forum, SimpleSend, SimpleReceive
+from kxgames.core import Engine
+from kxgames.network import PickleServer, PickleClient
+from kxgames.messaging import Forum, SimpleSend, SimpleReceive
 
 
 class ServerNetworkSetup (Engine):
@@ -23,10 +24,11 @@ class ServerNetworkSetup (Engine):
         print 'S: Setting up server.'
         Engine.__init__ (self, loop)
 
+        host = network_settings.host
         port = network_settings.port
         seats = network_settings.seats
         callback = self.server_full_callback
-        self.server = PickleServer (port, seats, callback)
+        self.server = PickleServer (host, port, seats, callback)
 
     def setup (self):
         self.server.open()
@@ -99,7 +101,7 @@ class ServerPregame (Engine):
 
     def successor (self):
         pipes = self.server.get_pipes()
-        forum = Forum(*pipes)
+        forum = Forum(*pipes, safe=False)
 
         return ServerGame(self.loop, forum, self.world)
 
@@ -128,9 +130,13 @@ class ServerGame (Engine):
         self.reflex = Reflex(self, subscriber, self.world)
         #ai_relay = AIRelay(self)
 
+        self.gui = server_gui.SimpleGui(self.world)
+
     def setup (self):
         self.referee.setup()
         self.reflex.setup()
+
+        self.gui.setup()
 
         self.forum.lock()
 
@@ -140,6 +146,8 @@ class ServerGame (Engine):
         self.reflex.update(time)
         self.world.update(time)
         self.referee.update(time)
+
+        self.gui.update(time)
 
     # Methods {{{1
     def game_over(self):
@@ -234,7 +242,7 @@ class ClientPregame (Engine):
 
     def successor (self):
         pipe = self.client.get_pipe()
-        forum = Forum(pipe)
+        forum = Forum(pipe, safe=False)
 
         return ClientGame(self.loop, forum, self.world)
     

@@ -1,9 +1,10 @@
 import random
 
+import game_settings
 from messages import *
-from utilities.vector import Vector
-from utilities.messaging import Forum
-from utilities.core import Task
+from kxgames.vector import Vector
+from kxgames.messaging import Forum
+from kxgames.core import Task
 
 class Reflex (Task):
     """ The only relay that can change the world (data)."""
@@ -17,6 +18,7 @@ class Reflex (Task):
     def setup (self):
         forum = self.forum
         # set up subscriptions
+        forum.subscribe(Sync, self.sync)
         forum.subscribe(Accelerate, self.accelerate)
         forum.subscribe(Bite, self.bite)
         forum.subscribe(ChangeEater, self.change_eater)
@@ -25,6 +27,20 @@ class Reflex (Task):
         forum.subscribe(Bounce, self.bounce)
         forum.subscribe(GameOver, self.game_over)
     # }}}1
+
+    # Sync {{{1
+    def sync (self, message):
+        positions = message.positions_dict
+        velocities = message.velocities_dict
+        #accelerations = message.accelerations_dict
+        players = self.world.players
+
+        for identity, player in players.items():
+            player.set_position(positions[identity])
+            player.set_velocity(velocities[identity])
+
+            #behavior = player.get_player_behavior()
+            #behavior.set_acceleration(accelerations[identity])
 
     # Accelerate {{{1
     def accelerate (self, message):
@@ -87,23 +103,29 @@ class Reflex (Task):
         identity = message.identity
         orientations = message.orientations
         player = self.world.players[identity]
+        radius = game_settings.player_radius
+
         x, y = player.get_position().get_pygame()
         vx, vy = player.get_velocity().get_pygame()
         map_x, map_y = self.world.get_map_size().get_pygame()
+        old_vx = vx
+        old_vy = vy
 
         for orientation in orientations:
             if 'Left' == orientation:
-                x = 0
-                vx = -vx
+                x = radius
+                vx *= -1
             elif 'Right' == orientation:
-                x = map_x
-                vx = -vx
+                x = map_x - radius
+                vx *= -1
             if 'Top' == orientation:
-                y = map_y
-                vy = -vy
+                y = map_y - radius
+                vy *= -1
             elif 'Bottom' == orientation:
-                y = 0
-                vy = -vy
+                y = radius
+                vy *= -1
+
+        owner_id = self.world.get_owner_identity()
         player.set_position(Vector(x,y))
         player.set_velocity(Vector(vx,vy))
 
@@ -146,6 +168,9 @@ class Referee (Task):
         self.forum = forum 
         self.world = world
 
+        self.sync_frequency = game_settings.sync_frequency
+        self.sync_timer = 0
+
     def setup (self):
         pass
 
@@ -154,6 +179,24 @@ class Referee (Task):
         forum = self.forum
         players = self.world.get_players()
         targets = self.world.get_targets()
+
+        # Periodically send Sync message {{{2
+        self.sync_timer += time
+        if self.sync_timer >= self.sync_frequency:
+            self.sync_timer -= self.sync_frequency
+            sync_positions = {}
+            sync_velocities = {}
+            sync_accelerations = {}
+
+            for identity, player in self.world.players.items():
+                sync_positions[identity] = player.get_position()
+                sync_velocities[identity] = player.get_velocity()
+                sync_accelerations[identity] = player.get_acceleration()
+
+            sync = Sync(sync_positions, sync_velocities, sync_accelerations)
+            forum.publish(sync)
+
+        # }}}2
 
         # Check for number of players. If only one, announce winner. {{{2
         if 1 == len(players):
@@ -198,15 +241,16 @@ class Referee (Task):
 
     # Methods {{{1
     def check_bounce(self, player):
+        radius = game_settings.player_radius
         map_x, map_y = self.world.get_map_size().get_pygame()
         x,y = player.get_position().get_pygame()
         orientations = []
 
-        if x < 0: orientations.append('Left')
-        elif x > map_x: orientations.append('Right')
+        if x < radius: orientations.append('Left')
+        elif x > (map_x - radius): orientations.append('Right')
 
-        if y < 0: orientations.append('Bottom')
-        elif y > map_y: orientations.append('Top')
+        if y < radius: orientations.append('Bottom')
+        elif y > (map_y - radius): orientations.append('Top')
 
         return orientations
         

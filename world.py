@@ -1,7 +1,7 @@
 import random
 
-from utilities.vector import Vector
-from utilities.sprites import *
+from kxgames.vector import Vector
+from kxgames.sprites import *
 import game_settings
 
 class World:
@@ -64,7 +64,7 @@ class World:
     def destroy_player (self, player_id):
         try:
             del self.players[player_id]
-        except ValueError:
+        except KeyError:
             pass
 
     def change_eater (self, new, old):
