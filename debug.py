@@ -1,39 +1,14 @@
 #!/usr/bin/env python
-
+from kxgames.core import *
 import main
-import multiprocessing
 
-class DebuggingProcess(multiprocessing.Process):
-    """ Wrap one of the main loops so that it can be executed in a background
-    process.  This makes it much easier to simulate network games. """
+debugger = LoopDebugger()
 
-    def __init__(self, name, loop):
-        multiprocessing.Process.__init__(self, name=name)
-        self.loop = loop
+import network_settings
+network_settings.host = 'localhost'
 
-    def __nonzero__(self):
-        return self.is_alive()
+debugger.loop("Server", main.ServerLoop())
+debugger.loop("Client 1", main.UserLoop())
+debugger.loop("Client 2", main.UserLoop())
 
-    def run(self):
-        try: self.loop.play()
-        except KeyboardInterrupt:
-            pass
-
-
-if __name__ == "__main__":
-
-    threads = [
-            DebuggingProcess("Server", main.ServerLoop()),
-            DebuggingProcess("Client", main.UserLoop()),
-            DebuggingProcess("Client", main.UserLoop()) ]
-
-    try:
-        for thread in threads:
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
-    except KeyboardInterrupt:
-        pass
-
+debugger.run()

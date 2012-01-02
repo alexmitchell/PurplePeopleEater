@@ -32,9 +32,10 @@ class ChangeEater (object):
         self.old = old_eater
 
 class MoveTarget (object):
-    def __init__(self, identity, position, reset=False):
+    def __init__(self, identity, position, timeout=None, reset=False):
         self.identity = identity
         self.position = position
+        self.timeout = timeout
         self.reset_life = reset
 
 class Bounce (object):

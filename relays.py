@@ -94,6 +94,7 @@ class Reflex (Task):
         target = self.world.targets[message.identity]
         target.set_position(message.position)
         target.reset_timer()
+        target.set_timeout(message.timeout)
         if message.reset_life:
             target.reset_life()
 
@@ -235,11 +236,19 @@ class Referee (Task):
             # Check for timeouts. Move target if it has timed out. {{{2
             if target.get_timer() >= target.get_timeout():
                 new_position = self.random_position()
-                move_target = MoveTarget(identity, new_position)
+                timeout = self.calculate_timeout()
+                move_target = MoveTarget(identity, new_position, timeout)
                 forum.publish(move_target)
             # }}}2
 
     # Methods {{{1
+    def calculate_timeout(self):
+        rand = random.random()
+        timeout = game_settings.target_timeout
+        range = 2 * game_settings.target_timeout_variation
+        new_timeout = timeout + range * (rand - 0.5)
+        return new_timeout
+
     def check_bounce(self, player):
         radius = game_settings.player_radius
         map_x, map_y = self.world.get_map_size().get_pygame()

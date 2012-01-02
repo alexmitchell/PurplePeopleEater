@@ -130,13 +130,13 @@ class ServerGame (Engine):
         self.reflex = Reflex(self, subscriber, self.world)
         #ai_relay = AIRelay(self)
 
-        self.gui = server_gui.SimpleGui(self.world)
+        #self.gui = server_gui.SimpleGui(self.world)
 
     def setup (self):
         self.referee.setup()
         self.reflex.setup()
 
-        self.gui.setup()
+        #self.gui.setup()
 
         self.forum.lock()
 
@@ -147,7 +147,7 @@ class ServerGame (Engine):
         self.world.update(time)
         self.referee.update(time)
 
-        self.gui.update(time)
+        #self.gui.update(time)
 
     # Methods {{{1
     def game_over(self):
@@ -160,11 +160,12 @@ class ServerGame (Engine):
         return None
     
     def teardown(self):
+        time.sleep(5)
         self.reflex.teardown()
         self.referee.teardown()
         self.forum.teardown()
         self.world.teardown()
-        time.sleep(1)
+        print "Server terminated."
 # }}}1
 
 class ServerPostgame (Engine):
@@ -314,16 +315,19 @@ class ClientPostgame (Engine):
         #self.forum.subscribe(Quit, self.quit)
         self.forum.lock()
 
-    def update (self, time):
-        self.forum.update()
+    def update (self, tiempo):
+        #self.forum.update()
         # self.gui.update (time)
+        time.sleep(1)
+        self.exit_loop()
         
     def quit (self, message):
         self.exit_loop()
 
     def teardown (self):
+        time.sleep(5)
         self.gui.teardown()
         self.forum.teardown()
         self.world.teardown()
-        time.sleep(1)
+        print "Client terminated."
 # }}}1

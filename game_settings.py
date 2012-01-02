@@ -12,14 +12,15 @@ player_count = human_count + ai_count
 eater_count = int((player_count + 1) / 2)
 target_count = int((player_count + 1) / 2)
 
-target_timeout = 5
 target_radius = 20
+target_timeout = 5
+target_timeout_variation = 3
 
 player_life = 10
 bite_damage = 1
 player_radius = 30
 player_mass = 1
 maximum_velocity = 130
-maximum_acceleration = (3/4) * maximum_velocity
+maximum_acceleration = (4/4) * maximum_velocity
 
 friction_coefficient = 1/2

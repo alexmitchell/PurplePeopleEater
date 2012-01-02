@@ -19,3 +19,4 @@ player_colors = {
         5:Color("Cyan")}
 
 target_color = Color ("white")
+target_ring_thickness = 6

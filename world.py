@@ -189,11 +189,18 @@ class Target (Token):
     def reset_timer(self):
         self.timer = 0
 
+    def set_timeout(self, timeout):
+        if timeout:
+            self.timeout = timeout
+        else:
+            self.timeout = game_settings.target_timeout
+
     def get_timer(self): return self.timer
     def get_timeout(self): return self.timeout
     # }}}1
 
 class PlayerAcceleration(BaseBehavior):
+    # PlayerAcceleration {{{1
     def __init__(self):
         self.acceleration = Vector.null()
 
