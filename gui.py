@@ -56,7 +56,7 @@ class Gui:
         owner_identity = world.get_owner_identity()
 
         # Draw the background. {{{2
-        #screen.fill(player_settings.background_color)
+        screen.fill(player_settings.background_color)
 
         # Draw the players. {{{2
         player_colors = player_settings.player_colors
@@ -68,7 +68,6 @@ class Gui:
             position = player.get_position().pygame
             radius = player.get_radius()
 
-            self.erase_sprite(player, time)
             pygame.draw.circle(screen, color, position, radius)
 
         # Draw the targets. {{{2
@@ -79,7 +78,6 @@ class Gui:
             radius = target.get_radius()
 
             if is_eater:
-                self.erase(target, time)
                 pygame.draw.circle(screen, target_color, position, radius)
             else:
                 progress = 1 - target.get_timer() / target.get_timeout()
@@ -121,25 +119,19 @@ class Gui:
         pygame.display.flip()
 
     # }}}1
-    def erase_sprite(self, sprite, time):
-        #color = player_settings.background_color
-        color = Color("Red")
-        position = sprite.get_position()
-        velocity = sprite.get_velocity()
-        radius = sprite.get_radius()
-
-        offset = velocity * time
-        center = (position - velocity).get_pygame()
-        
-        radius += 2
-
-        pygame.draw.circle(self.screen, color, center, radius)
-
-
     # Attributes {{{1
     def get_world(self):
         return self.world
 
     #}}}1
 
+""" 
+class Eraser:
+    def draw(self):
+        raise NotImplementedError
 
+class CircleEraser (Eraser):
+    def __init__ (self, center, radius):
+        self.center = center
+        self.radius = radius
+         """

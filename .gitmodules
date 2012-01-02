@@ -1,3 +1,4 @@
 [submodule "kxgames"]
 	path = kxgames
-	url = /home/git/game-engine
+	url = git@github.com:kxgames/GameEngine.git
+        #url = /home/git/game-engine
